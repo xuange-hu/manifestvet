@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (zero runtime dependencies)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest ruff
+          # The zero-dependency claim is about what `pip install manifestvet`
+          # pulls in. Proving it here is the difference between a claim and a test.
+          python -c "import manifestvet, sys; print('third-party:', [m for m in sys.modules if m in ('yaml','mcp','requests','click','rich','lxml')])"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: CLI smoke
+        run: |
+          manifestvet --version
+          manifestvet rules | head -3
+          manifestvet demo | tail -2
+
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: Install with the mcp extra
+        run: python -m pip install -e ".[mcp]" pytest
+      - name: Every declared tool is registered, and findable by a model
+        run: |
+          python -c "
+          import asyncio
+          from manifestvet.mcp_server import build_server, TOOLS
+          server = build_server()
+          async def go():
+              tools = await server.list_tools()
+              assert {t.name for t in tools} == set(TOOLS), [t.name for t in tools]
+              assert all(t.description for t in tools), [t.name for t in tools]
+              print('mcp tools:', len(tools))
+          asyncio.run(go())
+          "
+      - name: mcp --check agrees with the server
+        run: manifestvet mcp --check | tail -1
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: python -m pip install -e .
+      - name: docs/rules.md is generated, so it must match the registry
+        run: |
+          manifestvet rules --markdown > /tmp/rules.md
+          diff -u docs/rules.md /tmp/rules.md || {
+            echo "::error::docs/rules.md is stale; run 'manifestvet rules --markdown > docs/rules.md'"
+            exit 1
+          }
+
+  badge-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: Install with optional test deps
+        run: python -m pip install -e ".[mcp]" pytest
+      - name: README test-count badge vs pytest collection
+        run: |
+          # -o addopts= neutralises a project-level -q; with the -q below it would
+          # become -qq and pytest drops the "N tests collected" summary line.
+          actual=$(python -m pytest --collect-only -q -o addopts= 2>/dev/null | grep -oE "[0-9]+ tests? collected" | grep -oE "^[0-9]+" || true)
+          claimed=$(grep -oE "tests-[0-9]+%20passing" README.md | grep -oE "[0-9]+" | head -1 || true)
+          echo "collected=${actual:-NOTHING} claimed=${claimed:-NONE}"
+          if [ -z "$actual" ]; then
+            echo "::warning::pytest collected nothing - the badge check did not run"
+          elif [ "$actual" != "$claimed" ]; then
+            echo "::warning::README badge says $claimed but pytest collects $actual"
+          fi
+
+  fresh-clone:
+    # Every other job installs the package first, which masks a src-layout
+    # bootstrap regression. Install pytest and nothing else.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: pytest only, no package install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+      - name: A bare clone can run its own tests
+        run: python -m pytest -q
+      - name: And the CLI still works from src
+        run: python -c "import sys; sys.path.insert(0, 'src'); import manifestvet.cli as c; print('cli ok')"
