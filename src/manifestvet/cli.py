@@ -132,7 +132,10 @@ def _cmd_rules(args) -> int:
     if args.markdown:
         from .rulebook import full_markdown
 
-        print(full_markdown())
+        # write(), not print(): the generated document ends with its own newline,
+        # and `manifestvet rules --markdown > docs/rules.md` has to reproduce the
+        # file byte for byte or the CI docs job diffs a blank line forever.
+        sys.stdout.write(full_markdown())
         return 0
     if args.json:
         import json
