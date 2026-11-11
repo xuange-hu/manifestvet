@@ -1,7 +1,7 @@
 # manifestvet
 
 [![CI](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml/badge.svg)](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml)
-![tests-294%20passing](https://img.shields.io/badge/tests-294%20passing-brightgreen)
+![tests-314%20passing](https://img.shields.io/badge/tests-314%20passing-brightgreen)
 ![dependencies-0](https://img.shields.io/badge/dependencies-0-blue)
 ![rules-40](https://img.shields.io/badge/rules-40-informational)
 ![mcp-7%20tools](https://img.shields.io/badge/mcp-7%20tools-blueviolet)
@@ -60,6 +60,21 @@ uvx --from git+https://github.com/xuange-hu/manifestvet manifestvet scan app-rel
 
 `scan` accepts `.apk`, `.aab`, `.zip`, a bare `AndroidManifest.xml` (compiled **or** source),
 or a directory it walks, skipping `build/`, `.gradle/` and `intermediates/`.
+
+### Baselines: accept known findings, fail only on new ones
+
+```bash
+# snapshot today's reality (exits 0 even with findings)
+manifestvet scan app-release.apk --save-baseline .manifestvet-baseline.json
+
+# later runs: findings recorded in the baseline are accepted; a NEW finding exits 1
+manifestvet scan app-release.apk --baseline .manifestvet-baseline.json
+```
+
+The baseline file is diff-friendly JSON keyed by `(rule, where, message)` — deliberately
+not line or offset, which move on every recompile. Targets are keyed relative to the
+scan root, so the file survives a different checkout path. Commit it next to your CI
+workflow.
 
 Python 3.10+. Zero runtime dependencies. The `mcp` extra is the only optional one.
 

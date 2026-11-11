@@ -1,7 +1,7 @@
 # manifestvet（中文说明）
 
 [![CI](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml/badge.svg)](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml)
-![tests-294%20passing](https://img.shields.io/badge/tests-294%20passing-brightgreen)
+![tests-314%20passing](https://img.shields.io/badge/tests-314%20passing-brightgreen)
 ![dependencies-0](https://img.shields.io/badge/dependencies-0-blue)
 ![rules-40](https://img.shields.io/badge/rules-40-informational)
 
@@ -49,6 +49,20 @@ uvx --from git+https://github.com/xuange-hu/manifestvet manifestvet scan app-rel
 
 `scan` 接受 `.apk`、`.aab`、`.zip`、裸 `AndroidManifest.xml`（**编译后的二进制或源码 XML 都行**），
 或者一个目录（自动跳过 `build/`、`.gradle/`、`intermediates/`）。
+
+### 基线：接受已知结论，只对新问题退出 1
+
+```bash
+# 先固化当前现实（有结论也退出 0）
+manifestvet scan app-release.apk --save-baseline .manifestvet-baseline.json
+
+# 之后的运行：基线里已记录的结论被接受，出现**新**结论才退出 1
+manifestvet scan app-release.apk --baseline .manifestvet-baseline.json
+```
+
+基线文件是 diff 友好的 JSON，结论身份键为 `(rule, where, message)`——刻意不用行号和字节
+偏移（每次重新编译都会漂移）。目标按相对扫描根的路径做键，换 checkout 路径不会失效。
+和 CI workflow 一起提交即可。
 
 Python 3.10+，运行时零依赖，`mcp` 是唯一可选 extra。
 

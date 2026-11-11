@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "manifestvet"
-version = "0.1.0"
+version = "0.2.0"
 description = "Read an Android manifest the way an attacker does — zero-dependency AXML parser, 40 rules for the exported surface, byte-level evidence, SARIF for CI."
 readme = "README.md"
 requires-python = ">=3.10"

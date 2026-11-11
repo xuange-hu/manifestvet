@@ -12,7 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, apk, axml, engine, model, render, srctext
+from . import __version__, apk, axml, baseline, engine, model, render, srctext
 from .axml import AxmlError
 from .rules import SEVERITY_ORDER
 
@@ -42,6 +42,12 @@ def _parser() -> argparse.ArgumentParser:
     scan.add_argument("--explain", action="store_true", help="print the reasoning behind each rule")
     scan.add_argument("--no-color", action="store_true", help="disable ANSI colour")
     scan.add_argument("--quiet", action="store_true", help="one summary line per manifest")
+    scan.add_argument("--baseline", metavar="FILE",
+                      help="accept findings recorded in this baseline; only new ones are "
+                           "printed and counted toward --fail-on")
+    scan.add_argument("--save-baseline", metavar="FILE",
+                      help="write every current finding to FILE and exit 0 (generation mode; "
+                           "honours --min-severity if set)")
 
     demo = sub.add_parser("demo", help="audit a generated corpus that covers every rule")
     demo.add_argument("--explain", action="store_true")
@@ -85,9 +91,19 @@ def _cmd_scan(args) -> int:
     targets, problem = _targets(args.path)
     if problem:
         return problem
+    baseline_data = None
+    accepted_total = 0
+    if args.baseline:
+        try:
+            baseline_data = baseline.load(args.baseline)
+        except baseline.BaselineError as exc:
+            print(f"manifestvet: {exc}", file=sys.stderr)
+            return 2
+    saved_reports: list[tuple[str, engine.Report]] = []
     exit_code = 0
     json_reports: list[dict] = []
     sarif_runs: list[dict] = []
+    fresh_total = 0
     for name, data in targets:
         try:
             app = model.load(data)
@@ -96,7 +112,15 @@ def _cmd_scan(args) -> int:
             exit_code = max(exit_code, 2)
             continue
         report = _filter(engine.run(app, target=name), args.min_severity)
-        if report.should_fail(args.fail_on):
+        key = baseline.storage_key(name, args.path)
+        saved_reports.append((key, report))
+        if baseline_data is not None:
+            persisted, fresh = baseline.compare(report.findings, baseline_data, key)
+            accepted_total += len(persisted)
+            fresh_total += len(fresh)
+            # Only the *new* findings drive rendering and the exit code.
+            report.findings = fresh
+        if report.should_fail(args.fail_on) and not args.save_baseline:
             exit_code = max(exit_code, 1)
         if args.format == "text":
             if args.quiet:
@@ -110,6 +134,16 @@ def _cmd_scan(args) -> int:
 
             sarif_runs.append(json.loads(render.sarif(report, tool_version=__version__))["runs"][0])
 
+    if args.save_baseline:
+        # Generation mode: the point is to record today's reality, not to fail
+        # on it.  Parse errors (exit 2) still surface.
+        baseline.save(args.save_baseline, baseline.build(saved_reports))
+        total = sum(len(r.findings) for _, r in saved_reports)
+        print(f"manifestvet: baseline written to {args.save_baseline} ({total} findings, "
+              f"{len(saved_reports)} target{'s' if len(saved_reports) != 1 else ''})")
+        return exit_code
+    if baseline_data is not None and args.format == "text":
+        print(f"# baseline: {accepted_total} accepted, {fresh_total} new")
     if args.format == "json":
         import json
 
