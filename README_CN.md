@@ -22,6 +22,16 @@ app-release.apk
            fix:   Remove android:debuggable, or gate it on a build type (debuggable true only in debug).
 ```
 
+## 目录
+
+- [三步跑通](#三步跑通)
+- [为什么要有这个工具](#为什么要有这个工具)
+- [规则](#规则)
+- [MCP](#mcp)
+- [怎么验证它没瞎报](#怎么验证它没瞎报)
+- [已知边界](#已知边界)
+- [许可](#许可)
+
 ## 三步跑通
 
 ```bash

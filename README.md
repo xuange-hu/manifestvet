@@ -32,6 +32,17 @@ app-release.apk
                   data over a Binder interface with a caller check (getCallingUid).
 ```
 
+## Contents
+
+- [Three steps](#three-steps)
+- [Why this exists](#why-this-exists)
+- [The rules](#the-rules)
+- [MCP](#mcp)
+- [How it compares](#how-it-compares)
+- [Verified, not asserted](#verified-not-asserted)
+- [Limitations](#limitations)
+- [License](#license)
+
 ## Three steps
 
 ```bash
