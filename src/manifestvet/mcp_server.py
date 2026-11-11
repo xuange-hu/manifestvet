@@ -26,6 +26,7 @@ TOOLS = (
     "manifestvet_rules",
     "manifestvet_sarif",
     "manifestvet_demo",
+    "manifestvet_attrs",
 )
 
 
@@ -278,6 +279,39 @@ def manifestvet_demo() -> str:
     )
 
 
+def manifestvet_attrs(path: str = ".") -> str:
+    """Dump every element and attribute with its byte offset: the evidence
+    view of what the parser saw, where it sits in the file, and which resource
+    id each attribute came from."""
+    from pathlib import Path
+
+    from . import apk, axml, srctext
+
+    try:
+        targets = list(apk.iter_targets(Path(path)))
+    except (OSError, FileNotFoundError) as exc:
+        return _error(str(exc))
+    if not targets:
+        return _error(f"no AndroidManifest.xml under {path}")
+
+    lines: list[str] = []
+    for name, data in targets:
+        try:
+            doc = axml.parse(data) if axml.looks_like_axml(data) else srctext.parse(data)
+        except AxmlError as exc:
+            lines.append(f"# {name}: {exc}")
+            continue
+        lines.append(f"# {name}  ({'axml' if doc.resource_ids else 'text'}, {doc.size} bytes)")
+        for element in doc.walk():
+            lines.append(f"{element.offset:#08x} L{element.line:<4d} <{element.name}>")
+            for attribute in element.attributes:
+                origin = f"0x{attribute.res_id:08x}" if attribute.res_id else "-"
+                lines.append(
+                    f"           {attribute.offset:#08x} {attribute.name}={attribute.value!r}  id={origin}"
+                )
+    return "\n".join(lines)
+
+
 def build_server():
     """Construct the MCP server. Requires the optional `mcp` extra."""
     from mcp.server.fastmcp import FastMCP
@@ -319,6 +353,11 @@ def build_server():
         """Audit a generated corpus that triggers every rule; one call proves the tool works."""
         return manifestvet_demo()
 
+    @mcp.tool(name="manifestvet_attrs")
+    def _attrs_tool(path: str = ".") -> str:
+        """Dump every element and attribute with its byte offset - the evidence view."""
+        return manifestvet_attrs(path)
+
     return mcp
 
 
@@ -331,6 +370,7 @@ def tool_manifest() -> list[dict[str, str]]:
         {"name": "manifestvet_rules", "description": manifestvet_rules.__doc__ or ""},
         {"name": "manifestvet_sarif", "description": manifestvet_sarif.__doc__ or ""},
         {"name": "manifestvet_demo", "description": manifestvet_demo.__doc__ or ""},
+        {"name": "manifestvet_attrs", "description": manifestvet_attrs.__doc__ or ""},
     ]
 
 

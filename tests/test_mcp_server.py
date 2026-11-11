@@ -21,8 +21,8 @@ NASTY = app_xml(
 )
 
 
-def test_tool_manifest_lists_seven_tools():
-    assert len(mcp_server.tool_manifest()) == 7
+def test_tool_manifest_lists_eight_tools():
+    assert len(mcp_server.tool_manifest()) == 8
     assert {t["name"] for t in mcp_server.tool_manifest()} == set(mcp_server.TOOLS)
 
 
@@ -131,3 +131,13 @@ def test_demo_tool_covers_every_rule():
     payload = json.loads(mcp_server.manifestvet_demo())
     assert payload["rules_triggered"] == payload["rules_total"] == 40
     assert len(payload["manifests"]) == 3
+
+
+def test_attrs_tool_dumps_offsets(tmp_path):
+    """The evidence view must carry byte offsets, lines and resource ids -
+    a dump without them proves nothing about where a value came from."""
+    (tmp_path / "AndroidManifest.xml").write_text(NASTY, encoding="utf-8")
+    out = mcp_server.manifestvet_attrs(str(tmp_path))
+    assert "<manifest" in out or "<application" in out
+    assert "0x" in out  # byte offsets are printed as hex
+    assert "L1" in out or "L" in out  # line numbers

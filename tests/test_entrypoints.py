@@ -31,7 +31,7 @@ def test_mcp_check_prints_every_tool(capsys):
     assert code == 0
     for name in mcp_server.TOOLS:
         assert name in out
-    assert "7 tools" in out
+    assert "8 tools" in out
 
 
 def test_mcp_tool_decorator_count_matches_the_manifest():
