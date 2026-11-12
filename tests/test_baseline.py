@@ -124,9 +124,28 @@ def test_baseline_identity_ignores_line_and_offset():
     assert len(persisted) == len(report.findings)
 
 
+def test_storage_key_under_posix_semantics(monkeypatch):
+    # CI runs on Ubuntu; force POSIX path semantics so this Windows dev box
+    # catches the same regressions instead of waiting for a red Actions email.
+    from pathlib import PurePosixPath
+
+    monkeypatch.setattr(baseline, "Path", PurePosixPath)
+    assert baseline.storage_key(
+        "/home/runner/work/repo/app/src/main/AndroidManifest.xml",
+        "/home/runner/work/repo",
+    ) == "app/src/main/AndroidManifest.xml"
+    assert baseline.storage_key("/tmp/x.apk", "/home/runner/work/repo") == "x.apk"
+    assert baseline.storage_key("/home/runner/work/repo/app.apk",
+                                "/home/runner/work/repo/app.apk") == "app.apk"
+
+
 def test_storage_key_is_portable():
-    assert baseline.storage_key("C:\\repo\\app\\AndroidManifest.xml", "C:\\repo") == "app/AndroidManifest.xml"
-    assert baseline.storage_key("C:\\elsewhere\\x.apk", "C:\\repo") == "x.apk"
+    # Relative paths work on both WindowsPath and PosixPath: a drive letter or
+    # backslashes would make this assertion platform-specific (CI is Ubuntu).
+    assert baseline.storage_key("repo/app/src/main/AndroidManifest.xml", "repo") == "app/src/main/AndroidManifest.xml"
+    assert baseline.storage_key("repo/app-release.apk", "repo") == "app-release.apk"
+    assert baseline.storage_key("elsewhere/x.apk", "repo") == "x.apk"
+    assert baseline.storage_key("repo/app-release.apk", "repo/app-release.apk") == "app-release.apk"
 
 
 # -- CLI level ------------------------------------------------------------------

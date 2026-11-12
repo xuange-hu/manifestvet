@@ -1,7 +1,7 @@
 # manifestvet
 
 [![CI](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml/badge.svg)](https://github.com/xuange-hu/manifestvet/actions/workflows/ci.yml)
-![tests-314%20passing](https://img.shields.io/badge/tests-314%20passing-brightgreen)
+![tests-315%20passing](https://img.shields.io/badge/tests-315%20passing-brightgreen)
 ![dependencies-0](https://img.shields.io/badge/dependencies-0-blue)
 ![rules-40](https://img.shields.io/badge/rules-40-informational)
 ![mcp-7%20tools](https://img.shields.io/badge/mcp-7%20tools-blueviolet)
